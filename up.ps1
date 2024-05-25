@@ -1,6 +1,11 @@
 #!/usr/bin/env pwsh
 $ErrorActionPreference = "Stop"
 
+function CaptureAzureSubscriptionId {
+    $subscriptionId = az account show --query id -o tsv
+    return $subscriptionId
+}
+
 function EnsureGensisCluster {
     $clusterName = "genesis"
     $clusterStatus = kind get clusters | Select-String -Pattern $clusterName
@@ -37,6 +42,24 @@ function EnsureAzureServiceOperator {
         --set crdPattern='resources.azure.com/*;containerservice.azure.com/*;keyvault.azure.com/*;managedidentity.azure.com/*;eventhub.azure.com/*'
 }
 
+function EnsureServicePrincipal {
+    param (
+        [string]$subsciptionId
+    )
+
+    $spStatus = az ad sp list --display-name "Genesis" | Select-String -Pattern "Genesis"
+    if ($null -ne $spStatus) {
+        return
+    }
+
+    Write-Output "Creating Service Principal in subscription $subsciptionId"
+    $sp = az ad sp create-for-rbac --name "Genesis" --role contributor --scopes "/subscriptions/$subsciptionId"
+    $appId = $sp | ConvertFrom-Json | Select-Object -ExpandProperty appId
+    $secret = $sp | ConvertFrom-Json | Select-Object -ExpandProperty password
+}
+
+$subsciptionId = CaptureAzureSubscriptionId
 EnsureGensisCluster
 EnsureCertManager
 EnsureAzureServiceOperator
+EnsureServicePrincipal $subsciptionId
