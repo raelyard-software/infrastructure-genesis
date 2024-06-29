@@ -47,6 +47,19 @@ function EnsureAzureServiceOperator {
         --set crdPattern='resources.azure.com/*;containerservice.azure.com/*;keyvault.azure.com/*;managedidentity.azure.com/*;eventhub.azure.com/*'
 }
 
+function EnsureArgoCd {
+    $chartStatus = helm list -n argocd | Select-String -Pattern "argocd"
+    if ($null -ne $chartStatus) {
+        return
+    }
+    $repoStatus = helm repo list | Select-String -Pattern "argocd"
+    if ($null -eq $repoStatus) {
+        helm repo add argo https://argoproj.github.io/argo-helm
+    }
+    helm repo update argo
+    helm upgrade --install argocd argo/argo-cd --create-namespace --namespace argocd
+}
+
 function MakeServicePrincipalClusterSecret {
     param (
         [string]$subsciptionId,
@@ -93,4 +106,5 @@ $tenantId = CaptureAzureTenantId
 EnsureGensisCluster
 EnsureCertManager
 EnsureAzureServiceOperator
+EnsureArgoCd
 EnsureServicePrincipal $tenantId $subsciptionId
