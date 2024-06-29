@@ -6,6 +6,11 @@ function CaptureAzureSubscriptionId {
     return $subscriptionId
 }
 
+function CaptureAzureTenantId {
+    $tenantId = az account show --query tenantId -o tsv
+    return $tenantId
+}
+
 function EnsureGensisCluster {
     $clusterName = "genesis"
     $clusterStatus = kind get clusters | Select-String -Pattern $clusterName
@@ -42,8 +47,31 @@ function EnsureAzureServiceOperator {
         --set crdPattern='resources.azure.com/*;containerservice.azure.com/*;keyvault.azure.com/*;managedidentity.azure.com/*;eventhub.azure.com/*'
 }
 
+function MakeServicePrincipalClusterSecret {
+    param (
+        [string]$subsciptionId,
+        [string]$tenantId,
+        [string]$appId,
+        [string]$secret
+    )
+
+@"
+apiVersion: v1
+kind: Secret
+metadata:
+    name: aso-credential
+    namespace: default
+stringData:
+    AZURE_SUBSCRIPTION_ID: "$subsciptionId"
+    AZURE_TENANT_ID: "$tenantId"
+    AZURE_CLIENT_ID: "$appId"
+    AZURE_CLIENT_SECRET: "$secret"
+"@ | kubectl apply -f -
+}
+
 function EnsureServicePrincipal {
     param (
+        [string]$tenantId,
         [string]$subsciptionId
     )
 
@@ -56,10 +84,13 @@ function EnsureServicePrincipal {
     $sp = az ad sp create-for-rbac --name "Genesis" --role contributor --scopes "/subscriptions/$subsciptionId"
     $appId = $sp | ConvertFrom-Json | Select-Object -ExpandProperty appId
     $secret = $sp | ConvertFrom-Json | Select-Object -ExpandProperty password
+
+    MakeServicePrincipalClusterSecret $subsciptionId $tenantId $appId $secret
 }
 
 $subsciptionId = CaptureAzureSubscriptionId
+$tenantId = CaptureAzureTenantId
 EnsureGensisCluster
 EnsureCertManager
 EnsureAzureServiceOperator
-EnsureServicePrincipal $subsciptionId
+EnsureServicePrincipal $tenantId $subsciptionId

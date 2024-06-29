@@ -8,7 +8,7 @@ function TeardownGensisCluster {
             kind delete cluster --name genesis
         }
         catch {
-            # The first ateempt to delete the cluster may fail on trying to kill container - retry generally works
+            # The first attempt to delete the cluster may fail on trying to kill container - retry generally works
             kind delete cluster --name genesis
         }
     }
