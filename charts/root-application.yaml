@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: azure-cluster
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/raelyard-software/infrastructure-genesis
+    targetRevision: main
+    path: charts/azure-cluster
+    helm:
+      parameters:
+      - name: environment
+        value: dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: azure-cluster
+  syncPolicy:
+    automated:
+      allowEmpty: true
+      prune     : true
+      selfHeal  : true
+    syncOptions: ["CreateNamespace=true"]
+    retry:
+      backoff:
+        duration   : "5s"
+        factor     : 2
+        maxDuration: "3m"
+      limit: 2
